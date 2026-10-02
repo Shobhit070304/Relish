@@ -17,6 +17,8 @@ export function updateDishAtVersion(dishId, expectedVersion, changes) {
 }
 
 export function insertSeedDishes(dishes) {
+    // Use $setOnInsert which only inserts when the document does not exist.
+  // This preserves any manually edited version fields if the script were re-run.
   return Dish.bulkWrite(dishes.map((dish) => ({
     updateOne: {
       filter: { dishId: dish.dishId },

@@ -24,6 +24,7 @@ export async function saveDish(dishId, body) {
   const savedDish = await updateDishAtVersion(dishId, expectedVersion, { dishName, isPublished });
   if (savedDish) return savedDish;
 
+  // If update returned null, another process updated the dish. Fetch latest and return 409.
   const latestDish = await findDishById(dishId);
   if (!latestDish) throw new AppError('Dish not found.', 404);
   throw new AppError('This dish changed since it was loaded.', 409, { currentDish: latestDish });
