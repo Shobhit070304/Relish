@@ -10,7 +10,7 @@ async function startServer() {
   initWebSocketServer(server);
 
   server.listen(env.port, () => {
-    console.log(`Nosh API listening on http://localhost:${env.port}`);
+    console.log(`Relish API listening on http://localhost:${env.port}`);
   });
 }
 

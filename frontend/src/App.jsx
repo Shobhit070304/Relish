@@ -6,7 +6,7 @@ import SiteHeader from './components/SiteHeader.jsx';
 
 function getSavedTheme() {
   try {
-    return localStorage.getItem('nosh-theme') === 'dark' ? 'dark' : 'light';
+    return localStorage.getItem('relish-theme') === 'dark' ? 'dark' : 'light';
   } catch {
     return 'light';
   }
@@ -18,7 +18,7 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
-      localStorage.setItem('nosh-theme', theme);
+      localStorage.setItem('relish-theme', theme);
     } catch {
       // The app still works when browser storage is unavailable.
     }

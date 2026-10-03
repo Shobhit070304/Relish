@@ -26,7 +26,7 @@ export default function HomePage() {
             <div className="hero-orbit orbit-one" /><div className="hero-orbit orbit-two" />
             <div className="hero-image-frame">
               {featuredDish && <img src={featuredDish.imageUrl} alt={featuredDish.dishName} onError={(event) => { event.currentTarget.hidden = true; }} />}
-              <span className="hero-image-fallback">Made with care<br /><small>served with a little Nosh</small></span>
+              <span className="hero-image-fallback">Made with care<br /><small>served with a little Relish</small></span>
               <div className="hero-image-shade" />
               <div className="hero-image-caption"><span>ON THE MENU</span><strong>{featuredDish?.dishName || 'A good thing, cooking'}</strong></div>
             </div>
@@ -41,15 +41,15 @@ export default function HomePage() {
         <div className="container promise-inner"><span>GOOD MENUS TAKE CARE</span><i /> <span>DRAFT BEFORE YOU SAVE</span><i /> <span>YOUR CHANGES STAY YOURS</span></div>
       </section>
 
-      <section className="benefits-section section-pad" id="why-nosh">
+      <section className="benefits-section section-pad" id="why-relish">
         <div className="container">
-          <div className="section-intro"><div className="eyebrow">A BETTER WAY TO KEEP UP</div><h2>Small details.<br /><em>More peace of mind.</em></h2><p>Menu updates should feel easy and safe. Nosh keeps the important parts clear, without adding more process to your day.</p></div>
+          <div className="section-intro"><div className="eyebrow">A BETTER WAY TO KEEP UP</div><h2>Small details.<br /><em>More peace of mind.</em></h2><p>Menu updates should feel easy and safe. Relish keeps the important parts clear, without adding more process to your day.</p></div>
           <div className="benefit-grid">{benefits.map((benefit) => <article className="benefit-card" key={benefit.number}><span className="benefit-number">{benefit.number}</span><div className="benefit-icon" aria-hidden="true">{benefit.number === '01' ? '✎' : benefit.number === '02' ? '↗' : '♡'}</div><h3>{benefit.title}</h3><p>{benefit.text}</p></article>)}</div>
         </div>
       </section>
 
       <section className="steps-section section-pad" id="how-it-works">
-        <div className="container steps-layout"><div className="steps-heading"><div className="eyebrow">THREE EASY STEPS</div><h2>From thought<br />to <em>table.</em></h2><p>Your menu is always yours to shape. Nosh gives every edit a safe place to land.</p><a className="text-link" href="/dishes">Take a look around <span aria-hidden="true">↗</span></a></div><div className="steps-list"><article><span>01</span><div><h3>Make it yours</h3><p>Change a dish name or update its menu status.</p></div><span className="step-symbol">✎</span></article><article><span>02</span><div><h3>Keep it in draft</h3><p>Review your edits before anything is saved.</p></div><span className="step-symbol">◷</span></article><article><span>03</span><div><h3>Save when ready</h3><p>Your update is checked and safely stored.</p></div><span className="step-symbol">✓</span></article></div></div>
+        <div className="container steps-layout"><div className="steps-heading"><div className="eyebrow">THREE EASY STEPS</div><h2>From thought<br />to <em>table.</em></h2><p>Your menu is always yours to shape. Relish gives every edit a safe place to land.</p><a className="text-link" href="/dishes">Take a look around <span aria-hidden="true">↗</span></a></div><div className="steps-list"><article><span>01</span><div><h3>Make it yours</h3><p>Change a dish name or update its menu status.</p></div><span className="step-symbol">✎</span></article><article><span>02</span><div><h3>Keep it in draft</h3><p>Review your edits before anything is saved.</p></div><span className="step-symbol">◷</span></article><article><span>03</span><div><h3>Save when ready</h3><p>Your update is checked and safely stored.</p></div><span className="step-symbol">✓</span></article></div></div>
       </section>
 
       <section className="menu-section section-pad" id="menu">

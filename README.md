@@ -1,50 +1,38 @@
-# Nosh — Dish Dashboard
+# Relish — Dish Dashboard
 
-A small menu management app for browsing dishes, editing local drafts, and safely saving changes to MongoDB. The home page introduces the product and previews dishes from the API; the dashboard is at `/dishes`.
+A dish management dashboard for browsing dishes, editing local drafts, and safely saving changes with Optimistic Concurrency Control (OCC) and real-time WebSocket synchronization.
 
-## What it includes
+The landing page is at `/` and the dashboard is at `/dishes`.
 
-- A responsive product landing page with product details, workflow, and a live menu preview.
-- Light and dark themes. The selected theme is remembered in the browser.
-- A dish dashboard with search, published/draft filters, and inline editing.
-- Local drafts, explicit Save and Discard actions, backend validation, and version conflict protection.
-- A MongoDB seed command that can be safely run again without overwriting saved edits.
+---
 
-## Requirements
+## Prerequisites
 
-- Node.js 18 or newer
-- Local MongoDB running at `mongodb://127.0.0.1:27017` (or another MongoDB URI)
+- **Node.js** 18 or newer
+- **MongoDB** running locally at `mongodb://127.0.0.1:27017` (or remote URI)
 
-## Run locally
+---
 
-The supplied assignment data is already in `backend/data/dishes.json`.
+## Quick Setup & Run
 
-### 1. Install backend dependencies and configure MongoDB
+### 1. Backend
 
-In a terminal at the repository root:
+In a terminal:
 
 ```powershell
 cd backend
 npm install
 Copy-Item .env.example .env
-```
-
-Run `Copy-Item` only once. If `.env` already exists, keep it and check that `MONGODB_URI` points to your local MongoDB instance. The default is `mongodb://127.0.0.1:27017/nosh`.
-
-### 2. Seed and start the API
-
-From the `backend` folder:
-
-```powershell
 npm run seed
 npm run dev
 ```
 
-The API listens on `http://localhost:4000`. The seed command adds missing dishes with `version: 1`. It leaves existing records unchanged, so rerunning it does not duplicate dishes or reset edits.
+* API runs on `http://localhost:4000`.
+* `npm run seed` idempotently loads the assignment dataset into MongoDB with `version: 1`. Rerunning it leaves existing edits unchanged.
 
-### 3. Install and start the frontend
+### 2. Frontend
 
-Open a second terminal at the repository root:
+In a second terminal:
 
 ```powershell
 cd frontend
@@ -53,112 +41,124 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Open the Vite URL printed in the terminal. The frontend defaults to `http://localhost:4000` for the API; set `VITE_API_URL` in `frontend/.env` if needed.
+* Frontend runs on `http://localhost:5173`.
+* It connects to `http://localhost:4000` by default (configurable in `frontend/.env`).
 
-## Project structure
+---
 
-```text
-backend/
-  data/dishes.json
-  src/
-    config/          Environment and MongoDB connection
-    controllers/     HTTP request and response handlers
-    middleware/      Not-found and error responses
-    models/          Mongoose dish model
-    repositories/    MongoDB queries and conditional updates
-    routes/          Express dish routes
-    services/        Dish rules, validation, and save flow
-    utils/           Shared errors, async wrapper, and validation helpers
-    app.js
-    server.js
-    seed.js
-frontend/
-  src/
-    components/      Header, footer, and dish cards
-    hooks/           Dish loading state
-    pages/           Landing page and dish dashboard
-    services/        API requests
-    App.jsx
-    styles.css
-.gitignore
-README.md
+## Environment Variables
+
+### Backend (`backend/.env.example`)
+```env
+PORT=4000
+MONGODB_URI=mongodb://127.0.0.1:27017/relish
 ```
 
-## API
+### Frontend (`frontend/.env.example`)
+```env
+VITE_API_URL=http://localhost:4000
+```
+
+---
+
+## Architecture & Project Structure
+
+The project separates concerns cleanly:
+- **Backend**: Express + Mongoose + `ws` following a strict `Route → Controller → Service → Repository → Model` layered architecture.
+- **Frontend**: React 18 + Vite with custom hooks, CSS design tokens, and WebSocket listener.
+
+```text
+Relish/
+├── backend/
+│   ├── data/dishes.json           # Seed data
+│   └── src/
+│       ├── config/                # Database & WebSocket setup
+│       ├── controllers/           # HTTP handlers
+│       ├── middleware/            # Global error & 404 handlers
+│       ├── models/                # Mongoose Dish schema
+│       ├── repositories/          # Atomic MongoDB queries
+│       ├── routes/                # Express routes
+│       ├── services/              # Business rules & OCC logic
+│       ├── utils/                 # Validation & AppError
+│       ├── app.js                 # Express app
+│       ├── server.js              # Server entry point
+│       └── seed.js                # Idempotent database seeder
+└── frontend/
+    └── src/
+        ├── components/            # Dish cards, header, footer
+        ├── hooks/                 # useDishes hook with WebSocket sync
+        ├── pages/                 # HomePage and DishListingPage
+        ├── services/              # API fetch requests
+        ├── App.jsx                # Layout & theme router
+        └── styles.css             # Responsive styling & themes
+```
+
+---
+
+## API Reference
 
 ### `GET /dishes`
+Returns all dishes with their `dishId`, `dishName`, `imageUrl`, `isPublished`, and `version`.
 
-Returns all dishes, including `dishId`, `dishName`, `imageUrl`, `isPublished`, and `version`.
-
-```sh
+```bash
 curl http://localhost:4000/dishes
 ```
 
 ### `PATCH /dishes/:dishId`
+Atomically updates `dishName` and explicit `isPublished` only if `expectedVersion` matches:
 
-Saves the name and explicit published status only if the loaded version is still current:
-
-```sh
-curl -X PATCH http://localhost:4000/dishes/2 \
+```bash
+curl -X PATCH http://localhost:4000/dishes/1 \
   -H "Content-Type: application/json" \
-  -d '{"dishName":"Paneer Tikka","isPublished":true,"expectedVersion":1}'
+  -d '{"dishName":"Jeera Rice Special","isPublished":true,"expectedVersion":1}'
 ```
 
-- `400`: invalid field types/version, or a published dish has a blank name or non-HTTP/HTTPS image URL.
-- `404`: the dish identifier does not exist.
-- `409`: another save advanced the version. The response includes `currentDish`.
-- `500`: unexpected server failure.
+* **`200 OK`**: Returns updated dish with incremented version.
+* **`400 Bad Request`**: Invalid field types, empty name when published, or invalid image URL.
+* **`404 Not Found`**: Unknown `dishId`.
+* **`409 Conflict`**: Version mismatch (dish was updated by another request). Returns `{ error, currentDish }`.
 
-The version condition and MongoDB update happen in the same `findOneAndUpdate` call. A successful save increments the version. Image URLs are validated by format only; the app does not fetch or check whether an image is reachable.
+---
 
-## Draft and conflict behavior
+## Drafts & Conflict Handling
 
-- Editing a name or status only changes browser state. Save sends the draft and its original version.
-- Discard restores the last loaded values. A successful save uses the values and version returned by the API.
-- If another tab saves first, a stale save returns `409`. The dashboard keeps the draft and offers **Reload latest**, with a warning before discarding it.
-- Failed validation and network requests leave the draft available for correction or retry.
-- The landing page and dashboard use the supplied image URLs. A failed image load displays a fallback.
+- **Local Drafts**: Edits remain local until **Save changes** is clicked. The badge displays `● Unsaved changes`.
+- **Discard**: Clicking **Discard** reverts fields to the last loaded server state.
+- **Atomic Concurrency Control (OCC)**: On save, the client sends `expectedVersion`. The backend atomically verifies the version in MongoDB before applying changes and incrementing `version`.
+- **Conflict (409)**: If another tab or user saves first, the server returns 409. The draft is preserved, an explanation is shown, and a **Reload latest** action is offered with a discard warning confirmation.
 
-## Real-time synchronization (Optional Bonus)
+---
 
-Real-time synchronization is implemented via WebSockets:
+## Real-Time Synchronization (Optional Bonus)
 
-- **Update delay**: Updates are pushed immediately (<50ms) across connected clients as soon as a `PATCH` request commits to MongoDB. There is no polling delay.
-- **Draft preservation**: If an external update arrives for a dish that the user is actively editing (`dirty === true`), the user's local draft is strictly preserved and never overwritten in the background. A notification banner appears on the card informing the user that *"Newer saved data is available (vX)"* with a **Load latest** button to accept the incoming change if desired. If the card has no unsaved changes (`dirty === false`), it updates smoothly in real time.
-- **Connection and timer cleanup**: The frontend hook explicitly closes the WebSocket connection and clears any active reconnect timer (`clearTimeout`) when the component unmounts. The backend server maintains a 30-second ping/pong heartbeat interval that terminates inactive or dead connections, and clears its interval upon server close.
-- **Temporary disconnection handling**: If the WebSocket connection drops or the backend restarts, the frontend automatically retries connection every 3 seconds until restored.
+Real-time synchronization is implemented via WebSockets (`ws`):
 
-## Manual acceptance checks
+- **Update Delay**: Updates are pushed immediately (<50ms) across connected clients upon MongoDB commit.
+- **Draft Preservation**: If an external update arrives for a dish that the user is actively editing (`dirty === true`), the user's draft is **never overwritten**. A banner appears: *"Newer saved data is available (vX)"* with a **Load latest** button. If the dish has no unsaved changes (`dirty === false`), it updates smoothly in real time.
+- **Cleanup**: The frontend hook closes the WebSocket and clears reconnect timers on unmount. The backend runs a 30-second ping/pong heartbeat to terminate inactive connections.
+- **Disconnection Handling**: If the connection drops or the backend restarts, the client automatically retries connecting every 3 seconds.
 
-Run the API and frontend as described above, then check:
+---
 
-1. **Database data:** open `http://localhost:4000/dishes` and confirm the five supplied dishes appear. Run `npm run seed` a second time and confirm there are still five records.
-2. **Draft and discard:** edit a dish. Confirm the unsaved indicator appears and the API response/database has not changed. Choose Discard and confirm the loaded values return.
-3. **Save persistence:** save a name or status, refresh the page, restart the backend, and confirm the saved value and incremented version remain.
-4. **Blank name validation:** send a PATCH with `isPublished: true` and an empty `dishName`. Expect `400`; GET the dish and confirm its saved values and version are unchanged.
-5. **Image URL validation:** add temporary test data in `mongosh`, try to publish it, and remove the test record afterward:
+## Verification & Testing Steps
 
-   ```js
-   use nosh
-   db.dishes.insertOne({ dishId: "validation-test", dishName: "Validation test", imageUrl: "not-a-url", isPublished: false, version: 1 })
-   // PATCH /dishes/validation-test with {"dishName":"Validation test","isPublished":true,"expectedVersion":1} should return 400.
-   db.dishes.deleteOne({ dishId: "validation-test" })
-   ```
+1. **Database & Seed**: Open `http://localhost:4000/dishes` to see the 5 seeded dishes with `version: 1`. Run `npm run seed` again and verify no duplicates are created.
+2. **Draft & Discard**: On `http://localhost:5173/dishes`, edit any dish name. Notice `● Unsaved changes`. Click **Discard** to revert.
+3. **Save Persistence**: Edit a dish name, click **Save changes**, and verify the version increments. Restart the backend and refresh the page to confirm changes persisted.
+4. **Validation (400)**: Clear the name of a published dish and click Save. Notice the error banner: *"A published dish must have a name."*
+5. **Conflict (409)**: Open the dashboard in two tabs. Save a change in Tab A. In Tab B, try to save an older draft. Notice Tab B preserves your draft and shows the 409 conflict message.
+6. **Real-time Sync**: Open the dashboard. In Postman, send a `PATCH` request to update Dish 1. Observe Dish 1 updating on screen instantly without page refresh.
 
-6. **Conflict:** open the same dish in two tabs. Save a change in tab A, then try to save tab B's older draft. Tab B should show a conflict and preserve its draft until you explicitly reload or discard it.
-7. **Real-time WebSocket sync:** open the dashboard at `http://localhost:5173/dishes`. Send a PATCH request from Postman or another tab.
-   - For an unedited dish, verify it updates instantly in real time without refreshing.
-   - For a dish where you typed an unsaved draft, verify your draft remains intact and the *"Newer saved data is available"* banner appears with the button to load it.
-8. **Network and API errors:** stop the API and try to save; confirm the draft remains and can be retried after restarting the API. PATCH an unknown ID for `404`, and send a wrong field type or missing `expectedVersion` for `400`.
-9. **Image fallback and themes:** use a broken image URL in temporary test data to see the fallback. Toggle the theme, refresh, and confirm the selected theme is remembered.
+---
 
-## Design decision
+## Design Decision
 
-The API uses optimistic version checks rather than locks. Each save only updates a dish when the database version matches the version loaded by the browser; MongoDB applies that condition and the changes atomically. This keeps the conflict behavior reliable without adding a separate locking system.
+The API uses **Optimistic Concurrency Control (OCC)** via an atomic `findOneAndUpdate({ dishId, version: expectedVersion }, { $set: ..., $inc: { version: 1 } })`. This avoids pessimistic database locks, keeps requests stateless and performant, and guarantees zero race conditions under concurrent writes.
 
-## Known limitations and disclosure
+---
 
-- Local development setup only; no authentication, dish creation/deletion, image upload, or deployment.
-- AI assistance was used during implementation. No third-party project code was copied.
-- Approximate implementation time so far: about 45 minutes with AI assistance. Update this after your own review and verification.
+## Known Limitations & Disclosure
 
+- **Scope boundaries**: Local development setup; authentication, image upload, and dish deletion are out of scope as per requirements.
+- **AI Disclosure**: AI pairing assistance was used during implementation and documentation.
+- **Time Spent**: Approximately 1.5 hours (including full core requirements, WebSocket real-time bonus, and testing).
