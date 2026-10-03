@@ -3,7 +3,7 @@ import DishEditorCard from '../components/DishEditorCard.jsx';
 import { useDishes } from '../hooks/useDishes.js';
 
 export default function DishListingPage() {
-  const { dishes, loading, error, reload, replaceDish } = useDishes();
+  const { dishes, loading, error, reload, replaceDish, incomingUpdate } = useDishes();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -23,7 +23,19 @@ export default function DishListingPage() {
       {!loading && error && <div className="listing-state listing-error"><strong>Couldn’t load your dishes.</strong><span>{error}</span><button className="button button-primary" onClick={reload}>Try again</button></div>}
       {!loading && !error && dishes.length === 0 && <div className="listing-state"><strong>No dishes yet</strong><span>Run the seed command to load your menu.</span></div>}
       {!loading && !error && dishes.length > 0 && filteredDishes.length === 0 && <div className="listing-state"><strong>No matches</strong><span>Try another dish name or filter.</span></div>}
-      {!loading && !error && filteredDishes.length > 0 && <div className="editor-grid">{filteredDishes.map((dish) => <DishEditorCard key={`${dish.dishId}-${dish.version}`} dish={dish} onSaved={replaceDish} onReload={reload} />)}</div>}
+      {!loading && !error && filteredDishes.length > 0 && (
+        <div className="editor-grid">
+          {filteredDishes.map((dish) => (
+            <DishEditorCard
+              key={dish.dishId}
+              dish={dish}
+              externalUpdate={incomingUpdate?.dishId === dish.dishId ? incomingUpdate : null}
+              onSaved={replaceDish}
+              onReload={reload}
+            />
+          ))}
+        </div>
+      )}
       <div className="listing-tip"><span aria-hidden="true">✳</span><p><strong>A small reminder</strong> You can edit freely. Nothing changes on your saved menu until you choose Save.</p></div>
     </div>
   );

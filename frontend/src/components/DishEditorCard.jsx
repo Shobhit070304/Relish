@@ -1,20 +1,62 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { updateDish } from '../services/dishes.js';
 
-export default function DishEditorCard({ dish, onSaved, onReload }) {
+export default function DishEditorCard({ dish, externalUpdate, onSaved, onReload }) {
   const [name, setName] = useState(dish.dishName);
   const [published, setPublished] = useState(dish.isPublished);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
+  const [newerDataAvailable, setNewerDataAvailable] = useState(null);
+
   const dirty = name !== dish.dishName || published !== dish.isPublished;
+
+  // Sync state if dish prop changes and user is not editing
+  useEffect(() => {
+    if (!dirty) {
+      setName(dish.dishName);
+      setPublished(dish.isPublished);
+    }
+  }, [dish.dishName, dish.isPublished, dirty]);
+
+  // Handle external WebSocket updates
+  useEffect(() => {
+    if (!externalUpdate || externalUpdate.dishId !== dish.dishId) return;
+    if (externalUpdate.version <= dish.version) return;
+
+    if (dirty) {
+      // PRESERVE DRAFT: do not overwrite local draft, show notification banner
+      setNewerDataAvailable(externalUpdate);
+    } else {
+      // NO UNSAVED CHANGES: safely update to latest server state
+      onSaved(externalUpdate);
+      setName(externalUpdate.dishName);
+      setPublished(externalUpdate.isPublished);
+      setNewerDataAvailable(null);
+    }
+  }, [externalUpdate, dirty, dish.dishId, dish.version, onSaved]);
+
+  function acceptExternalUpdate() {
+    if (newerDataAvailable) {
+      onSaved(newerDataAvailable);
+      setName(newerDataAvailable.dishName);
+      setPublished(newerDataAvailable.isPublished);
+      setNewerDataAvailable(null);
+      setError('');
+      setConflict(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
     setError('');
     setConflict(false);
     try {
-      onSaved(await updateDish(dish, { dishName: name, isPublished: published }));
+      const saved = await updateDish(dish, { dishName: name, isPublished: published });
+      onSaved(saved);
+      setName(saved.dishName);
+      setPublished(saved.isPublished);
+      setNewerDataAvailable(null);
     } catch (saveError) {
       setError(saveError.message || 'Could not reach the server. Your draft is still here.');
       setConflict(saveError.status === 409);
@@ -31,6 +73,12 @@ export default function DishEditorCard({ dish, onSaved, onReload }) {
     <article className="editor-card">
       <DishPreviewCardForEditor dish={dish} published={published} />
       <div className="editor-body">
+        {newerDataAvailable && (
+          <div className="form-message conflict-message" style={{ marginBottom: '10px' }} role="status">
+            <span>✳ Newer saved data is available (v{newerDataAvailable.version})</span>
+            <button type="button" onClick={acceptExternalUpdate}>Load latest</button>
+          </div>
+        )}
         <div className="editor-id"><span>DISH ID</span><code>{dish.dishId}</code><span className="version-label">VERSION {dish.version}</span></div>
         <label className="field-label" htmlFor={`dish-name-${dish.dishId}`}>Dish name</label>
         <input className="text-input" id={`dish-name-${dish.dishId}`} value={name} onChange={(event) => setName(event.target.value)} />

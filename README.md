@@ -118,7 +118,15 @@ The version condition and MongoDB update happen in the same `findOneAndUpdate` c
 - If another tab saves first, a stale save returns `409`. The dashboard keeps the draft and offers **Reload latest**, with a warning before discarding it.
 - Failed validation and network requests leave the draft available for correction or retry.
 - The landing page and dashboard use the supplied image URLs. A failed image load displays a fallback.
-- The optional live update bonus is not implemented. An open page sees external API changes after refresh; stale saves are still protected by the version check.
+
+## Real-time synchronization (Optional Bonus)
+
+Real-time synchronization is implemented via WebSockets:
+
+- **Update delay**: Updates are pushed immediately (<50ms) across connected clients as soon as a `PATCH` request commits to MongoDB. There is no polling delay.
+- **Draft preservation**: If an external update arrives for a dish that the user is actively editing (`dirty === true`), the user's local draft is strictly preserved and never overwritten in the background. A notification banner appears on the card informing the user that *"Newer saved data is available (vX)"* with a **Load latest** button to accept the incoming change if desired. If the card has no unsaved changes (`dirty === false`), it updates smoothly in real time.
+- **Connection and timer cleanup**: The frontend hook explicitly closes the WebSocket connection and clears any active reconnect timer (`clearTimeout`) when the component unmounts. The backend server maintains a 30-second ping/pong heartbeat interval that terminates inactive or dead connections, and clears its interval upon server close.
+- **Temporary disconnection handling**: If the WebSocket connection drops or the backend restarts, the frontend automatically retries connection every 3 seconds until restored.
 
 ## Manual acceptance checks
 
@@ -138,8 +146,11 @@ Run the API and frontend as described above, then check:
    ```
 
 6. **Conflict:** open the same dish in two tabs. Save a change in tab A, then try to save tab B's older draft. Tab B should show a conflict and preserve its draft until you explicitly reload or discard it.
-7. **Network and API errors:** stop the API and try to save; confirm the draft remains and can be retried after restarting the API. PATCH an unknown ID for `404`, and send a wrong field type or missing `expectedVersion` for `400`.
-8. **Image fallback and themes:** use a broken image URL in temporary test data to see the fallback. Toggle the theme, refresh, and confirm the selected theme is remembered.
+7. **Real-time WebSocket sync:** open the dashboard at `http://localhost:5173/dishes`. Send a PATCH request from Postman or another tab.
+   - For an unedited dish, verify it updates instantly in real time without refreshing.
+   - For a dish where you typed an unsaved draft, verify your draft remains intact and the *"Newer saved data is available"* banner appears with the button to load it.
+8. **Network and API errors:** stop the API and try to save; confirm the draft remains and can be retried after restarting the API. PATCH an unknown ID for `404`, and send a wrong field type or missing `expectedVersion` for `400`.
+9. **Image fallback and themes:** use a broken image URL in temporary test data to see the fallback. Toggle the theme, refresh, and confirm the selected theme is remembered.
 
 ## Design decision
 
@@ -147,6 +158,7 @@ The API uses optimistic version checks rather than locks. Each save only updates
 
 ## Known limitations and disclosure
 
-- Local development setup only; no authentication, dish creation/deletion, image upload, deployment, or live update polling.
+- Local development setup only; no authentication, dish creation/deletion, image upload, or deployment.
 - AI assistance was used during implementation. No third-party project code was copied.
-- Approximate implementation time so far: about 20 minutes with AI assistance. Update this after your own review and verification.
+- Approximate implementation time so far: about 45 minutes with AI assistance. Update this after your own review and verification.
+

@@ -1,6 +1,7 @@
 import { AppError } from '../utils/appError.js';
 import { isHttpUrl, validateDishUpdate } from '../utils/dishValidation.js';
 import { findAllDishes, findDishById, updateDishAtVersion } from '../repositories/dishRepository.js';
+import { broadcastDishUpdate } from '../config/websocket.js';
 
 export function getDishes() {
   return findAllDishes();
@@ -22,7 +23,10 @@ export async function saveDish(dishId, body) {
   }
 
   const savedDish = await updateDishAtVersion(dishId, expectedVersion, { dishName, isPublished });
-  if (savedDish) return savedDish;
+  if (savedDish) {
+    broadcastDishUpdate(savedDish)
+    return savedDish;
+  }
 
   // If update returned null, another process updated the dish. Fetch latest and return 409.
   const latestDish = await findDishById(dishId);

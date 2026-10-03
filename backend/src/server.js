@@ -1,10 +1,15 @@
 import { env } from './config/env.js';
 import { connectToDatabase } from './config/database.js';
 import app from './app.js';
+import http from 'node:http';
+import { initWebSocketServer } from './config/websocket.js';
 
 async function startServer() {
   await connectToDatabase();
-  app.listen(env.port, () => {
+  const server = http.createServer(app);
+  initWebSocketServer(server);
+
+  server.listen(env.port, () => {
     console.log(`Nosh API listening on http://localhost:${env.port}`);
   });
 }
